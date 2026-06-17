@@ -1,0 +1,40 @@
+# Build artifacts
+target/
+**/target/
+
+# macOS noise
+.DS_Store
+
+# Editor / IDE noise
+*.swp
+.idea/
+.vscode/
+
+# Claude Code local settings / session state
+.claude/
+
+# Note: Cargo.lock is intentionally committed — kernel and boot are
+# binary crates, and reproducible builds require pinning dependencies.
+
+# Stage 11+ Boot-LLM models (large binary files, not tracked in git)
+kernel/programs/*.gguf
+kernel/programs/*.safetensors
+
+# Large model binaries (never tracked anywhere in the tree)
+*.gguf
+*.smodel
+
+# Python bytecode caches
+__pycache__/
+*.pyc
+
+# Logs and build/merge leftovers
+*.log
+*.orig
+
+# Internal deploy scripts / artifacts (must never be committed)
+deploy-cherry-*
+
+# Misc non-project files
+wm2026-*
+
