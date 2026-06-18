@@ -99,3 +99,4 @@ When filing a bug, include the architecture (x86_64 / aarch64), how you built
 reports, contact the maintainer privately rather than opening a public issue.
 
 We appreciate every contribution — thank you for helping build Zero.
+
