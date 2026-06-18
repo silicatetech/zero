@@ -253,3 +253,4 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details on the dual-licensing model
 <p align="center">
   <a href="https://silicate.tech">Website</a> · <a href="https://x.com/silicate_tech">X / Twitter</a>
 </p>
+
