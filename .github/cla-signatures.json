@@ -1,0 +1,13 @@
+{
+  "cla_version": "1.0",
+  "comment": "Signatures recorded by the CLA bot. Do not edit by hand unless you know what you are doing. Each entry records a contributor who agreed to CLA.md.",
+  "signatures": [
+    {
+      "username": "tomstuhl",
+      "cla_version": "1.0",
+      "pull_request": 3,
+      "comment_id": 4745475839,
+      "signed_at": "2026-06-18T19:32:37.646Z"
+    }
+  ]
+}

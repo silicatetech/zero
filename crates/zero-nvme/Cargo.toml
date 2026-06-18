@@ -1,0 +1,14 @@
+[package]
+name = "zero-nvme"
+license = "AGPL-3.0-or-later"
+version = "0.1.0"
+edition = "2021"
+authors = ["Tom Stuhl"]
+description = "no_std NVMe wire types and command builders for Zero"
+
+[lib]
+name = "zero_nvme"
+path = "src/lib.rs"
+
+[dependencies]
+# Pure no_std, zero external runtime deps.

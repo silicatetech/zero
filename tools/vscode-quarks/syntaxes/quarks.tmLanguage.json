@@ -1,0 +1,87 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Quarks",
+    "scopeName": "source.quarks",
+    "patterns": [
+        { "include": "#comment-block" },
+        { "include": "#comment-line" },
+        { "include": "#bytes" },
+        { "include": "#handle" },
+        { "include": "#integer" },
+        { "include": "#keyword-control" },
+        { "include": "#keyword-declaration" },
+        { "include": "#type-keyword" },
+        { "include": "#operator-arrow" },
+        { "include": "#operator-comparison" },
+        { "include": "#operator-arithmetic" },
+        { "include": "#operator-equals" },
+        { "include": "#punctuation" },
+        { "include": "#identifier" }
+    ],
+    "repository": {
+        "comment-line": {
+            "name": "comment.line.double-slash.quarks",
+            "match": "//.*$"
+        },
+        "comment-block": {
+            "name": "comment.block.quarks",
+            "begin": "/\\*",
+            "end": "\\*/"
+        },
+        "integer": {
+            "name": "constant.numeric.integer.quarks",
+            "match": "\\b[0-9]+\\b"
+        },
+        "bytes": {
+            "name": "constant.other.bytes.quarks",
+            "match": "#x[0-9a-fA-F]*"
+        },
+        "handle": {
+            "name": "variable.other.handle.quarks",
+            "match": "@[0-9]+"
+        },
+        "keyword-control": {
+            "name": "keyword.control.quarks",
+            "match": "\\b(if|else|loop|break|return)\\b"
+        },
+        "keyword-declaration": {
+            "name": "keyword.declaration.quarks",
+            "match": "\\b(fn|let|intent)\\b"
+        },
+        "type-keyword": {
+            "name": "storage.type.quarks",
+            "match": "\\b(i64|bytes|handle)\\b"
+        },
+        "operator-comparison": {
+            "name": "keyword.operator.comparison.quarks",
+            "match": "==|!=|<=|>=|<|>"
+        },
+        "operator-arithmetic": {
+            "name": "keyword.operator.arithmetic.quarks",
+            "match": "[+\\-*/]"
+        },
+        "operator-arrow": {
+            "name": "keyword.operator.arrow.quarks",
+            "match": "->"
+        },
+        "operator-equals": {
+            "name": "keyword.operator.assignment.quarks",
+            "match": "="
+        },
+        "punctuation": {
+            "patterns": [
+                { "name": "punctuation.section.parens.begin.quarks", "match": "\\(" },
+                { "name": "punctuation.section.parens.end.quarks", "match": "\\)" },
+                { "name": "punctuation.section.braces.begin.quarks", "match": "\\{" },
+                { "name": "punctuation.section.braces.end.quarks", "match": "\\}" },
+                { "name": "punctuation.separator.comma.quarks", "match": "," },
+                { "name": "punctuation.separator.colon.quarks", "match": ":" },
+                { "name": "punctuation.terminator.statement.quarks", "match": ";" }
+            ]
+        },
+        "identifier": {
+            "name": "variable.other.quarks",
+            "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        }
+    }
+}

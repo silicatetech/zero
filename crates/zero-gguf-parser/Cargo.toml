@@ -1,0 +1,14 @@
+[package]
+name = "zero-gguf-parser"
+license = "AGPL-3.0-or-later"
+version = "0.1.0"
+edition = "2021"
+description = "no_std GGUF metadata parser for Zero Boot-LLM"
+authors = ["Tom Stuhl"]
+
+[lib]
+name = "zero_gguf_parser"
+path = "src/lib.rs"
+
+[dependencies]
+# Pure Rust, no_std + alloc, zero external runtime deps per ADR-028

@@ -1,0 +1,23 @@
+[package]
+name = "quarks-interpreter"
+license = "AGPL-3.0-or-later"
+version = "0.1.0"
+edition = "2021"
+authors = ["Tom Stuhl"]
+description = "Tree-walking interpreter for Quarks S-Expression IR"
+
+[lib]
+name = "quarks_interpreter"
+path = "src/lib.rs"
+
+[dependencies]
+quarks-validator = { path = "../quarks-validator" }
+
+# A.3 — property-based test harness for the explicit state-machine
+# refactor.  `proptest` works under regular `cargo test` (no nightly,
+# no external binary) and integrates cleanly with our no_std + alloc
+# library: it is std-only by design, but is gated to the `tests/`
+# directory which is built against `std`, not against the no_std
+# library proper.
+[dev-dependencies]
+proptest = { version = "1.4", default-features = false, features = ["std"] }

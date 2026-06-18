@@ -1,0 +1,13 @@
+[package]
+name = "zero-llm-inference"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Forward-pass operators for transformer inference (no_std, Ring-0)"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+libm = "0.2"
+zero-gguf-parser = { path = "../zero-gguf-parser" }

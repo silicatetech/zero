@@ -1,0 +1,42 @@
+[unstable]
+build-std = ["core", "compiler_builtins", "alloc"]
+build-std-features = ["compiler-builtins-mem"]
+
+[build]
+target = "x86_64-unknown-none"
+
+[target.x86_64-unknown-none]
+# CRITICAL: the x86_64-unknown-none target defaults to `+soft-float` and
+# excludes all vector ISAs (no SSE/AVX/AVX-512). Function-level
+# `#[target_feature(enable = "avx512f")]` is silently insufficient on
+# this baseline target — LLVM cannot materialise ZMM operations because
+# the *backend's* feature set forbids them, and the intrinsics degrade
+# to scalar code. Empirically discovered 2026-05-17 when the
+# kernel-cherry build of inference_avx512.rs contained ZERO vfmadd
+# instructions in .text despite #[target_feature] attributes on every
+# AVX-512 kernel.
+#
+# We therefore explicitly enable the full Zen-4 vector feature ladder
+# at the target-feature level. This makes LLVM honour both our explicit
+# intrinsics AND any auto-vectorisation it can do on scalar Rust loops
+# (e.g. framebuffer memset, byte copies). The pre-XSAVE-setup risk is
+# mitigated by hoisting `enable_fpu_simd()` to the very top of
+# kernel_main (kernel/src/main.rs) BEFORE the framebuffer or serial
+# console init — so XCR0 is live before any auto-vectorised memset
+# can issue a vector store.
+#
+# `-soft-float` is the critical one: without it, intrinsic FP ops
+# produce "Do not know how to soften this operator's operand" LLVM
+# errors when combined with +sse2 etc. The Zen-4 features below
+# include everything our AVX-512 kernels need plus AVX-VNNI (VPDPBUSD)
+# for the future VNNI Q4_K path.
+rustflags = [
+    "-C", "relocation-model=static",
+    "-C", "link-arg=--no-dynamic-linker",
+    "-C", "target-feature=-soft-float,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+fma,+bmi2,+avx512f,+avx512bw,+avx512vl,+avx512dq,+avx512vnni",
+]
+
+[target.aarch64-unknown-none]
+rustflags = [
+    "-C", "link-arg=-Taarch64-linker.ld",
+]

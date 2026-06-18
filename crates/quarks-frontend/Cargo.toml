@@ -1,0 +1,13 @@
+[package]
+name = "quarks-frontend"
+license = "AGPL-3.0-or-later"
+version = "0.1.0"
+edition = "2021"
+description = "Source-language frontend for Quarks (lexer, parser, codegen to S-expr IR)"
+
+[lib]
+name = "quarks_frontend"
+path = "src/lib.rs"
+
+[dependencies]
+quarks-validator = { path = "../quarks-validator" }

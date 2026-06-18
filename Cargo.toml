@@ -1,0 +1,24 @@
+[workspace]
+members = [
+    "crates/quarks-arena",
+    "crates/quarks-codegen",
+    "crates/quarks-frontend",
+    "crates/quarks-interpreter",
+    "crates/quarks-lsp",
+    "crates/quarks-validator",
+    "crates/zero-gguf-parser",
+    "crates/zero-hal",
+    "crates/zero-llm-inference",
+    "crates/zero-nvme",
+    "crates/kernel-tests",
+]
+
+# kernel/ and boot/ are excluded from the workspace because they
+# target x86_64-unknown-none (no_std, no host toolchain) and
+# x86_64 host respectively. They are built via Makefile, not
+# `cargo build` at the workspace root.
+exclude = [
+    "kernel",
+    "boot",
+    "scratch/*",
+]

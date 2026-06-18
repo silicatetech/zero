@@ -1,0 +1,1 @@
+(program (fn main () i64 (add 1 2)) (call main))

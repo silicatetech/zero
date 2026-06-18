@@ -1,0 +1,15 @@
+[package]
+name = "kernel-tests"
+license = "AGPL-3.0-or-later"
+version = "0.0.1"
+edition = "2021"
+authors = ["Tom Stuhl"]
+description = "Host-buildable test harness for the otherwise no_std/x86_64-none Zero kernel. Pulls the kernel's pure leaf modules (partition math, weight-layout registry, TCP state machine, ice/nvme bit layouts) in via #[path] and runs their #[cfg(test)] suites under `cargo test`."
+
+[lib]
+name = "kernel_tests"
+path = "src/lib.rs"
+
+[dependencies]
+# Real workspace crate: the nvme probe leaf uses its spec constants.
+zero-nvme = { path = "../zero-nvme" }

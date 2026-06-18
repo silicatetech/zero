@@ -1,0 +1,21 @@
+[package]
+name = "zero-hal"
+version = "0.1.0"
+edition = "2021"
+authors = ["Tom Stuhl"]
+description = "Stage 12 Paket D — Hardware Capability Service HAL (GPU/Network/Storage/Display traits + providers)"
+license = "AGPL-3.0-or-later"
+
+[features]
+default = ["std"]
+std = []
+
+[lib]
+name = "zero_hal"
+path = "src/lib.rs"
+
+[dependencies]
+# Strictly no_std + alloc. No external dependencies — the HAL is the
+# innermost trust boundary for hardware abstraction and must compile
+# on every platform the kernel targets (x86_64 + aarch64 today, RISC-V
+# next per docs/discovery/hardware-abstraction-constraints.md §6).

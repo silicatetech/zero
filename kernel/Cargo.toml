@@ -1,0 +1,176 @@
+# The kernel is a standalone workspace root: it lives outside the
+# repo-level workspace (which excludes it) and targets bare-metal
+# `*-unknown-none`, so it must not be drawn into any other workspace
+# Cargo might discover by walking up the directory tree (notably from
+# inside a git worktree under `.claude/worktrees/`). The empty
+# `[workspace]` table below pins Cargo's workspace search to this
+# manifest. Functionally a no-op on the main repo (kernel was already
+# treated as standalone via `exclude = ["kernel"]`); fixes worktree
+# builds where the discovered parent workspace was the outer repo.
+[workspace]
+
+[package]
+name = "zero-kernel"
+license = "AGPL-3.0-or-later"
+version = "0.0.1"
+edition = "2021"
+authors = ["Tom Stuhl"]
+description = "Zero kernel"
+
+[features]
+default = []
+nondeterministic-sampling = []
+neon-acceleration = []
+# ADR-029 Phase 1+2+3: x86_64 AVX-512 acceleration + SMP multi-core
+# boot (ACPI MADT enumeration, INIT-SIPI-SIPI, AP trampoline,
+# parallel row-split matmul). Deployment target: AMD EPYC 9354P
+# (Zen 4, 32 cores, AVX-512F available). On hosts without AVX-512F
+# the build still succeeds (CPUID probe at boot keeps the BSP-only
+# code path; APs are simply not woken).
+avx512-acceleration = []
+streaming-mode = ["nondeterministic-sampling"]  # Sub-MP-G1: sampler + 128 tokens + system-prompt
+# Static-IP profile for bare-metal Cherry Server deployment. Default
+# build targets QEMU user-mode networking (10.0.2.15). Enable this
+# flag to compile the kernel with the Cherry Server's public IP and
+# placeholder gateway/netmask in `kernel/src/net/mod.rs`. The
+# gateway / netmask values must be verified against the Cherry
+# control panel before flashing — see docs/deployment-x86_64.md.
+cherry-net = []
+# Cherry/EPYC SMP bring-up telemetry. Keep this off for normal
+# benchmark/LLM images because it emits a once-per-second framebuffer
+# heartbeat. Enable together with `cherry-net,avx512-acceleration`
+# when validating AP wake-up on real hardware.
+cherry-smp-debug = []
+# Zero Control Plane. This keeps the UDP/TCP rescue console online
+# after hardware bring-up and before Stage 11 so operators can
+# inspect/tune the machine, then release the Boot-LLM with `llm start`.
+# This is an Zero-native control surface, not POSIX/SSH semantics.
+zero-control-plane = ["cherry-net"]
+# Per-token Top-K logit dump on the serial console. Useful for
+# Sub-MP-C5 verification chains and LLVM-codegen regression hunts,
+# expensive at runtime (a full 151k-entry scan + 10 serial lines
+# per generated token) and verbose on the single-core boot path.
+# Default OFF — turn on locally when verifying anchors against a
+# reference run.
+debug-logits = []
+# Swap the embedded detokenizer vocab from Qwen3 (151_669 tokens,
+# default) to Kimi K2.6 / Llama-3 family (128_256 tokens). Required
+# for any Cherry build that loads a deepseek2-architecture GGUF —
+# without this flag, generated Kimi token IDs decode against Qwen3
+# bytes and the serial output is gibberish. The Kimi vocab is
+# generated offline by `tools/extract_vocab.py` from the model's
+# `tokenizer.json`; until that file ships in the repo, the feature
+# builds against stub vocab bytes (decode_token returns empty for
+# every token, so the boot path prints token IDs only).
+kimi-k26-vocab = []
+# Grow the KV-cache arena from the default 512 MiB to 5 GiB, which is
+# what the naive (decompressed-K/V) MlaKvCache needs to hold a
+# 512-token context window for Kimi K2.6's full MLA dims (61 layers,
+# 128 heads, qk_nope=128, qk_rope=64, v_head=128). See
+# `KV_CACHE_ARENA_SIZE` in `kernel/src/memory.rs` for the per-token
+# arithmetic. Default builds (Qwen3) leave the arena at 512 MiB —
+# 5 GiB is overkill there and would waste contiguous frame budget on
+# QEMU dev hosts with 8 GiB RAM.
+kimi-k26-arena = []
+# ADR-029 v8.4: opt-in `_MM_HINT_NTA` software prefetch in the Q4_K /
+# Q6_K weight-streaming inner loops. NTA tells the cache controller
+# to bypass L2/L3 (load directly to a fill buffer / L1) — correct for
+# a single core that streams each weight byte exactly once. On Zen 4
+# with 4 physical cores sharing a CCD's 32 MiB L3, sibling cores
+# running adjacent row slices benefit from L3 reuse that NTA
+# bypasses. Chips-and-Cheese's Zen 4 memory-subsystem analysis
+# reports the L2 streamer saturates per-core BW without SW prefetch.
+#
+# Default OFF (per Phase-2 audit): A/B test against the hardware
+# prefetcher's natural behaviour is the only honest validation.
+# Build with --features cherry-net,avx512-acceleration,nta-prefetch
+# to enable, compare q4k_cycles vs the no-flag baseline.
+nta-prefetch = []
+# ADR-029 v8 candidate: AVX-512 VNNI (VPDPBUSD) Q4_K integer dot
+# product with Q8_K activation quantization. Promises ~2-4× over the
+# FP32 AVX-512 path by trading per-block FP32 mul/FMA for u8×s8 →
+# i32 VPDPBUSD followed by a single FP32 scale per super-block.
+#
+# NUMERICAL FOOTPRINT: this is a DIFFERENT mathematical operation
+# from the FP32 path — Q8 activation quantization adds ~0.5-2% error
+# per matmul, compounding through 28 layers. The Two-Anchor model
+# of ADR-029 v3 anticipates feature-mode logit_bits drift, but
+# Token-ID 25 stability under VNNI must be EMPIRICALLY VERIFIED on
+# Cherry hardware before this feature is enabled in production.
+#
+# Default OFF. Requires `avx512-acceleration`.
+vnni-acceleration = ["avx512-acceleration"]
+
+[dependencies]
+# Platform-agnostic dependencies
+lazy_static = { version = "1.5", features = ["spin_no_std"] }
+spin = "0.9"
+quarks-arena = { path = "../crates/quarks-arena", default-features = false, features = ["chunked"] }
+quarks-validator = { path = "../crates/quarks-validator" }
+quarks-interpreter = { path = "../crates/quarks-interpreter" }
+zero-gguf-parser = { path = "../crates/zero-gguf-parser" }
+zero-llm-inference = { path = "../crates/zero-llm-inference" }
+zero-nvme = { path = "../crates/zero-nvme" }
+libm = "0.2"
+
+# x86_64-specific dependencies (Sub-MP-D2a HAL extraction)
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+bootloader_api = "0.11"
+x86_64 = "0.15"
+font8x8 = { version = "0.3", default-features = false }
+
+# aarch64-specific dependencies (Sub-MP-D2b, per Sub-MP-D1 Item 5)
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+flat_device_tree = { version = "3.1", default-features = false }
+
+[build-dependencies]
+quarks-validator = { path = "../crates/quarks-validator" }
+quarks-codegen = { path = "../crates/quarks-codegen" }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+# Kernel binary opt-level = 1: prevents LLVM STP (Store Pair) in
+# pre-MMU boot path. HVF requires ISV=1 for Device memory store
+# traps; STP sets ISV=0 → assertion failure. Layout-dependent:
+# any code change can non-deterministically trigger STP emission.
+#
+# Inference hot paths are NOT affected — they use per-package
+# opt-level = 2 overrides below, which override this setting.
+#
+# Lesson 7+9: Pre-MMU-Device-Memory + HVF-Acceleration-Constraint
+opt-level = 1
+
+# Per-package opt-level overrides: restore opt-level = 2 for
+# performance-critical crates. These run post-MMU (Normal memory)
+# where STP is safe, and contain inference hot paths.
+[profile.release.package.zero-llm-inference]
+opt-level = 2
+[profile.release.package.zero-gguf-parser]
+opt-level = 2
+[profile.release.package.quarks-arena]
+opt-level = 2
+[profile.release.package.quarks-interpreter]
+opt-level = 2
+[profile.release.package.quarks-validator]
+opt-level = 2
+[profile.release.package.libm]
+opt-level = 2
+
+# Per-package opt-level override for pre-MMU bare-metal context.
+#
+# Per ARM ARM: Pre-MMU memory is treated as Device-nGnRnE which
+# enforces strict alignment unconditionally. LLVM at opt-level=2
+# vectorizes byte-level Rust (from_be_bytes on &[u8]) into aligned
+# LDR W/X instructions that fault on Device memory.
+#
+# flat_device_tree runs once at boot (~2ms operation) before MMU
+# enable (Stage 5-6). Reducing optimization for this one crate
+# prevents fatal vectorization without affecting hot paths
+# (inference, AOT executor, Boot-LLM).
+#
+# Lessons-Learned-7: Pre-MMU-Device-Memory-Discipline
+[profile.release.package.flat_device_tree]
+opt-level = 1

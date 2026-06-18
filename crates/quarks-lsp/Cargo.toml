@@ -1,0 +1,24 @@
+[package]
+name = "quarks-lsp"
+license = "AGPL-3.0-or-later"
+version = "0.1.0"
+edition = "2021"
+description = "Language Server for Quarks .qk files"
+
+[[bin]]
+name = "quarks-lsp"
+path = "src/main.rs"
+
+[lib]
+name = "quarks_lsp"
+path = "src/lib.rs"
+
+[dependencies]
+tower-lsp = "0.20"
+tokio = { version = "1", features = ["io-std", "macros", "rt-multi-thread", "sync", "time"] }
+quarks-frontend = { path = "../quarks-frontend" }
+serde_json = "1"
+
+[dev-dependencies]
+tower = "0.4"
+tokio = { version = "1", features = ["io-util", "macros", "rt-multi-thread", "test-util", "sync", "time"] }

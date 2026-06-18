@@ -1,0 +1,183 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Silicate (silicate.tech)
+
+name: CI
+
+# Continuous integration for the Zero kernel (bare-metal Rust, no_std).
+#
+# What runs here:
+#   * test          — cargo test on the host workspace (crates/*)
+#   * lint          — cargo clippy, warnings treated as errors
+#   * format        — cargo fmt --check
+#   * build-x86     — kernel-cherry build for x86_64-unknown-none
+#   * build-aarch64 — kernel build for aarch64-unknown-none
+#
+# Toolchain: the nightly channel + components are pinned in the repo's
+# `rust-toolchain.toml` (and `kernel/rust-toolchain.toml`). rustup installs
+# that toolchain automatically on the first cargo/make invocation; each job
+# adds the extra targets/components it needs (clippy, rustfmt, the bare-metal
+# targets). The kernel builds use build-std — that is configured in
+# `kernel/.cargo/config.toml`, so a plain `make` invocation is enough here.
+#
+# ---------------------------------------------------------------------------
+# Required status checks / CLA enforcement (repo-settings, one-time setup)
+# ---------------------------------------------------------------------------
+# Merge-blocking is enforced by GitHub branch protection, NOT by this file.
+# To make PRs un-mergeable until they are green AND the CLA is signed, go to
+#   Settings → Branches → Branch protection rules → main
+# and add these as *required status checks*:
+#   * license/cla        (published by .github/workflows/cla-check.yml)
+#   * test
+#   * lint
+#   * format
+#   * build-x86
+#   * build-aarch64
+# The CLA bot (cla-check.yml) is a separate workflow and stays as-is; this CI
+# workflow does not duplicate or replace it. The `license/cla` check must be
+# listed above so that a PR from an author who has not signed the CLA cannot
+# be merged.
+#
+# This workflow uses the `pull_request` trigger (not `pull_request_target`)
+# and needs NO secrets, so it runs correctly for fork PRs as well.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Read-only token — CI only builds and tests, it never pushes or deploys.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref to save runner minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Host workspace: format / lint / test. The kernel and boot crates are
+  # excluded from the root workspace (they target *-unknown-none), so these
+  # jobs operate on crates/* only and run on the stable host target.
+  # ---------------------------------------------------------------------------
+  format:
+    name: format (cargo fmt --check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Add rustfmt component
+        run: rustup component add rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+  lint:
+    name: lint (cargo clippy -D warnings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Add clippy component
+        run: rustup component add clippy
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-host-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-host-
+
+      - name: Clippy (warnings as errors)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: test (cargo test --workspace)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-host-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-host-
+
+      - name: Run workspace tests
+        run: cargo test --workspace
+
+  # ---------------------------------------------------------------------------
+  # Bare-metal kernel builds. These need the nightly toolchain plus rust-src
+  # (for build-std) and the corresponding *-unknown-none target. build-std and
+  # target-features are configured in kernel/.cargo/config.toml, so the make
+  # targets work unchanged in CI.
+  # ---------------------------------------------------------------------------
+  build-x86:
+    name: build-x86 (kernel-cherry / x86_64-unknown-none)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Add rust-src + x86_64 bare-metal target
+        run: |
+          rustup component add rust-src llvm-tools-preview
+          rustup target add x86_64-unknown-none
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            kernel/target/
+          key: ${{ runner.os }}-cargo-kernel-x86-${{ hashFiles('kernel/Cargo.lock', 'Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-kernel-x86-
+
+      - name: Build kernel (cherry profile)
+        run: make kernel-cherry
+
+  build-aarch64:
+    name: build-aarch64 (aarch64-unknown-none)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Add rust-src + aarch64 bare-metal target
+        run: |
+          rustup component add rust-src llvm-tools-preview
+          rustup target add aarch64-unknown-none
+
+      - name: Install cargo-binutils (provides rust-objcopy)
+        run: cargo install cargo-binutils --locked
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            kernel/target/
+          key: ${{ runner.os }}-cargo-kernel-aarch64-${{ hashFiles('kernel/Cargo.lock', 'Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-kernel-aarch64-
+
+      - name: Build kernel (aarch64) + objcopy to flat binary
+        run: make build-aarch64

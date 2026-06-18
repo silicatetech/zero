@@ -1,0 +1,18 @@
+[package]
+name = "quarks-codegen"
+license = "AGPL-3.0-or-later"
+version = "0.1.0"
+edition = "2021"
+description = "AOT codegen from S-Expression IR to x86_64 machine code"
+authors = ["Tom Stuhl"]
+
+[lib]
+name = "quarks_codegen"
+path = "src/lib.rs"
+
+[dependencies]
+quarks-validator = { path = "../quarks-validator" }
+iced-x86 = { version = "1.21", default-features = false, features = ["encoder", "code_asm", "no_std"] }
+
+[dev-dependencies]
+quarks-interpreter = { path = "../quarks-interpreter" }

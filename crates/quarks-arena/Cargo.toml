@@ -1,0 +1,21 @@
+[package]
+name = "quarks-arena"
+license = "AGPL-3.0-or-later"
+version = "0.1.0"
+edition = "2021"
+authors = ["Tom Stuhl"]
+description = "Bump-allocator arenas for Zero Ring-0 memory management"
+
+[dependencies]
+# Keine externen Dependencies. Pure no_std-fähiger Code.
+
+[features]
+default = ["std", "chunked"]
+std = []
+# `chunked` enables ChunkedArena (linked-chunks growth). Requires
+# alloc::Box and alloc::Vec, which forces consumers to provide a
+# global allocator. Disable for Ring-0 / no-allocator contexts that
+# only need FixedArena.
+chunked = []
+
+[lib]

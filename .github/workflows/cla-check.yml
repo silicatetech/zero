@@ -1,0 +1,252 @@
+name: CLA Check
+
+# Contributor License Agreement bot.
+#
+# How it works:
+#   * On every pull request, we look up the PR author in
+#     .github/cla-signatures.json. If they have signed, we publish a
+#     passing "license/cla" commit status; otherwise a failing one plus
+#     a one-time comment pointing at CLA.md.
+#   * A contributor signs by commenting the exact phrase
+#       "I have read the CLA and I agree"
+#     on their PR. The comment path records them in
+#     .github/cla-signatures.json (committed to the default branch) and
+#     flips the status on the PR head to passing.
+#
+# Make "license/cla" a *required status check* in branch protection so a
+# missing signature blocks merge. No external service is used.
+#
+# IMPORTANT: The `sign` job commits to the protected default branch.
+# GITHUB_TOKEN cannot push to a branch with required status checks, so
+# a PAT (classic, `repo` scope) from a repo admin must be stored as the
+# repository secret `CLA_TOKEN`.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write        # commit the updated signatures file
+  pull-requests: write   # comment on PRs
+  issues: write          # comment on the PR conversation (issue_comment)
+  statuses: write        # publish the license/cla commit status
+
+# Never run two signature-writing jobs at once (they touch the same file).
+concurrency:
+  group: cla-signatures
+  cancel-in-progress: false
+
+env:
+  CLA_FILE: .github/cla-signatures.json
+  CLA_DOC: CLA.md
+  SIGN_PHRASE: "I have read the CLA and I agree"
+  STATUS_CONTEXT: "license/cla"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Path 1 — a pull request was opened / updated. Verify the author signed.
+  # ---------------------------------------------------------------------------
+  check:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out default branch (for latest signatures)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Verify CLA signature
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+            const headSha = pr.head.sha;
+            const docUrl =
+              `${pr.base.repo.html_url}/blob/${context.payload.repository.default_branch}/${process.env.CLA_DOC}`;
+
+            // Bots never need to sign.
+            const isBot = pr.user.type === 'Bot' || author.endsWith('[bot]');
+
+            let signed = isBot;
+            try {
+              const data = JSON.parse(fs.readFileSync(process.env.CLA_FILE, 'utf8'));
+              signed = signed || (data.signatures || []).some(
+                s => s.username.toLowerCase() === author.toLowerCase());
+            } catch (e) {
+              core.warning(`Could not read ${process.env.CLA_FILE}: ${e.message}`);
+            }
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: headSha,
+              context: process.env.STATUS_CONTEXT,
+              state: signed ? 'success' : 'failure',
+              description: signed
+                ? 'CLA signed — thank you!'
+                : 'CLA not signed yet — comment to sign (see PR thread).',
+              target_url: docUrl,
+            });
+
+            if (signed) {
+              core.info(`@${author} has signed the CLA.`);
+              return;
+            }
+
+            // Post the instructions once per PR.
+            const marker = '<!-- cla-bot:request -->';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            if (comments.some(c => c.body && c.body.includes(marker))) {
+              core.info('CLA request comment already present.');
+              return;
+            }
+
+            const body = [
+              marker,
+              `### ✍️ Contributor License Agreement required`,
+              ``,
+              `Hi @${author}, thanks for your contribution! Before we can merge it,`,
+              `we need you to sign the **Silicate Individual CLA**.`,
+              ``,
+              `Zero / Silicate is **dual-licensed** (AGPLv3 community edition +`,
+              `a parallel commercial Enterprise edition). The CLA lets us offer your`,
+              `contribution under both licenses while **you keep full ownership** of`,
+              `your work.`,
+              ``,
+              `👉 **Please read the CLA:** [${process.env.CLA_DOC}](${docUrl})`,
+              ``,
+              `To sign, simply **post a new comment on this pull request** with`,
+              `exactly this phrase:`,
+              ``,
+              `> ${process.env.SIGN_PHRASE}`,
+              ``,
+              `The bot will record your signature and the \`${process.env.STATUS_CONTEXT}\``,
+              `check will turn green. You only need to do this once.`,
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body,
+            });
+
+            core.setFailed(`@${author} has not signed the CLA.`);
+
+  # ---------------------------------------------------------------------------
+  # Path 2 — someone commented on a PR. If it's the signing phrase, record it.
+  # ---------------------------------------------------------------------------
+  sign:
+    if: >
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request != null &&
+      contains(github.event.comment.body, 'I have read the CLA and I agree')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ secrets.CLA_TOKEN }}
+
+      - name: Record signature
+        id: record
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Require the phrase to be the (trimmed) comment, to avoid quoting
+            // the instructions accidentally signing someone.
+            const body = (context.payload.comment.body || '').trim();
+            const phrase = process.env.SIGN_PHRASE;
+            if (!body.toLowerCase().includes(phrase.toLowerCase())) {
+              core.info('Comment does not contain the signing phrase.');
+              return 'skip';
+            }
+
+            const signer = context.payload.comment.user.login;
+            const prNumber = context.payload.issue.number;
+
+            const path = process.env.CLA_FILE;
+            let data = { cla_version: '1.0', signatures: [] };
+            try { data = JSON.parse(fs.readFileSync(path, 'utf8')); } catch (e) {}
+            if (!Array.isArray(data.signatures)) data.signatures = [];
+
+            const already = data.signatures.some(
+              s => s.username.toLowerCase() === signer.toLowerCase());
+            if (!already) {
+              data.signatures.push({
+                username: signer,
+                cla_version: data.cla_version || '1.0',
+                pull_request: prNumber,
+                comment_id: context.payload.comment.id,
+                signed_at: new Date().toISOString(),
+              });
+              data.signatures.sort((a, b) =>
+                a.username.toLowerCase().localeCompare(b.username.toLowerCase()));
+              fs.writeFileSync(path, JSON.stringify(data, null, 2) + '\n');
+            }
+
+            core.setOutput('signer', signer);
+            core.setOutput('pr', String(prNumber));
+            core.setOutput('already', String(already));
+            return 'ok';
+
+      - name: Commit signature
+        if: steps.record.outputs.already == 'false'
+        run: |
+          if git diff --quiet -- "${CLA_FILE}"; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git config user.name  "cla-bot"
+          git config user.email "cla-bot@users.noreply.github.com"
+          git add "${CLA_FILE}"
+          git commit -m "chore(cla): record signature from @${{ steps.record.outputs.signer }} (#${{ steps.record.outputs.pr }})"
+          git push origin "HEAD:${{ github.event.repository.default_branch }}"
+
+      - name: Update PR status and thank the signer
+        if: steps.record.outputs.signer != ''
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const signer = '${{ steps.record.outputs.signer }}';
+            const prNumber = Number('${{ steps.record.outputs.pr }}');
+
+            // Fetch the PR to get its current head SHA, then flip the status.
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: pr.head.sha,
+              context: process.env.STATUS_CONTEXT,
+              state: 'success',
+              description: 'CLA signed — thank you!',
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: [
+                '<!-- cla-bot:signed -->',
+                `✅ Thank you, @${signer}! Your CLA signature has been recorded.`,
+                `The \`${process.env.STATUS_CONTEXT}\` check is now green and this`,
+                `applies to all your future contributions to this project.`,
+              ].join('\n'),
+            });

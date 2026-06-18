@@ -1,0 +1,8 @@
+[package]
+name = "quarks-validator"
+license = "AGPL-3.0-or-later"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# none in Micro-Prompt 1, kommen spaeter hinzu

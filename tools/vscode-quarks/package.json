@@ -1,0 +1,62 @@
+{
+    "name": "vscode-quarks",
+    "displayName": "Quarks (Dev)",
+    "description": "Development extension for Quarks .qk files. Proof-of-life LSP client for Stage 7.",
+    "version": "0.1.0",
+    "publisher": "silicatetech",
+    "private": true,
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+    "categories": ["Programming Languages"],
+    "activationEvents": [
+        "onLanguage:quarks"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "languages": [
+            {
+                "id": "quarks",
+                "aliases": ["Quarks", "quarks"],
+                "extensions": [".qk"],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "quarks",
+                "scopeName": "source.quarks",
+                "path": "./syntaxes/quarks.tmLanguage.json"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Quarks",
+            "properties": {
+                "quarks.serverPath": {
+                    "type": "string",
+                    "default": "quarks-lsp",
+                    "description": "Path to the quarks-lsp binary. Use an absolute path during development, e.g. '/path/to/repo/target/debug/quarks-lsp'."
+                },
+                "quarks.trace.server": {
+                    "type": "string",
+                    "enum": ["off", "messages", "verbose"],
+                    "default": "off",
+                    "description": "Trace LSP communication (for debugging)."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "dependencies": {
+        "vscode-languageclient": "^9.0.1"
+    },
+    "devDependencies": {
+        "@types/node": "^18.0.0",
+        "@types/vscode": "^1.80.0",
+        "typescript": "^5.0.0"
+    }
+}

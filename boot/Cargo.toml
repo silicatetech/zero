@@ -1,0 +1,24 @@
+# Standalone workspace — same rationale as kernel/Cargo.toml: pin
+# Cargo's workspace search here so that builds from inside a git
+# worktree (`.claude/worktrees/...`) don't get dragged into the outer
+# repo workspace.
+[workspace]
+
+[package]
+name = "boot"
+license = "AGPL-3.0-or-later"
+version = "0.0.1"
+edition = "2021"
+description = "Zero bootable disk-image builder (bootloader 0.11)"
+
+[dependencies]
+bootloader = "0.11"
+anyhow = "1"
+
+# Local patch for bootloader 0.11.15: FAT partition sizing formula in
+# `fat.rs` allocates only +1 MiB of padding, which is insufficient for
+# FAT32 metadata when the embedded ramdisk is >1 GiB (the GGUF case).
+# Vendored copy fixes the cushion. Not committed; uncommitted local
+# change in main checkout per task instructions.
+[patch.crates-io]
+bootloader = { path = "vendor-bootloader" }

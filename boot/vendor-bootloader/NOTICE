@@ -1,0 +1,5 @@
+This directory contains code originally written by Philipp Oppermann
+(Copyright (c) 2018 Philipp Oppermann), originally published under the
+MIT License at https://github.com/rust-osdev/bootloader. Modified and
+redistributed under AGPL-3.0-or-later as permitted by the MIT license
+terms.

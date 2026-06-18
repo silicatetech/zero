@@ -1,0 +1,10 @@
+name: 10_attention_weights_softmax
+shape: (16,)
+dtype: float32
+n_elements: 16
+first_8: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+last_8: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+min: 1.0
+max: 1.0
+mean: 1.0
+sum: 16.0
