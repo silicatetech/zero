@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Silicate (silicate.tech)
+
 name: CI
 
 # Continuous integration for the Zero kernel (bare-metal Rust, no_std).
@@ -84,9 +87,17 @@ jobs:
       - name: Add clippy component
         run: rustup component add clippy
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/cache@v4
         with:
-          shared-key: host-workspace
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-host-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-host-
 
       - name: Clippy (warnings as errors)
         run: cargo clippy --workspace --all-targets -- -D warnings
@@ -97,9 +108,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/cache@v4
         with:
-          shared-key: host-workspace
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-host-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-host-
 
       - name: Run workspace tests
         run: cargo test --workspace
@@ -121,11 +140,17 @@ jobs:
           rustup component add rust-src llvm-tools-preview
           rustup target add x86_64-unknown-none
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/cache@v4
         with:
-          # The kernel is a standalone workspace with its own target dir.
-          workspaces: kernel -> kernel/target
-          shared-key: kernel-x86
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            kernel/target/
+          key: ${{ runner.os }}-cargo-kernel-x86-${{ hashFiles('kernel/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-kernel-x86-
 
       - name: Build kernel (cherry profile)
         run: make kernel-cherry
@@ -144,10 +169,17 @@ jobs:
       - name: Install cargo-binutils (provides rust-objcopy)
         run: cargo install cargo-binutils --locked
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/cache@v4
         with:
-          workspaces: kernel -> kernel/target
-          shared-key: kernel-aarch64
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            kernel/target/
+          key: ${{ runner.os }}-cargo-kernel-aarch64-${{ hashFiles('kernel/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-kernel-aarch64-
 
       - name: Build kernel (aarch64) + objcopy to flat binary
         run: make build-aarch64
